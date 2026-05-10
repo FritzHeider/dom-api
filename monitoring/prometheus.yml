@@ -1,0 +1,80 @@
+# Prometheus Configuration for ChatGPT DOM Agent Bridge
+# This file configures Prometheus to scrape metrics from the bridge service
+
+global:
+  # How often to scrape targets by default
+  scrape_interval: 15s
+
+  # How long to wait for scrape requests to complete
+  scrape_timeout: 10s
+
+  # How often to evaluate rules
+  evaluation_interval: 15s
+
+  # The labels to add to any time series or alerts
+  external_labels:
+    monitor: 'chatgpt-bridge-monitor'
+    environment: 'production'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Scrape the ChatGPT Bridge service
+  - job_name: 'chatgpt_bridge'
+    # Metrics path defaults to '/metrics'; change if necessary
+    metrics_path: '/metrics'
+    # Scheme defaults to 'http'.
+    scheme: 'http'
+    # Static config for local service
+    static_configs:
+      - targets: ['localhost:8000']
+        labels:
+          service: 'bridge'
+          component: 'api'
+    # Scrape interval for this job (overrides global)
+    scrape_interval: 10s
+    # Timeout for this job (overrides global)
+    scrape_timeout: 5s
+    # Metric relabeling
+    metric_relabel_configs:
+      # Keep bridge metrics
+      - source_labels: [__name__]
+        regex: 'bridge_.*'
+        action: keep
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    # Metrics path defaults to '/metrics'; change if necessary.
+    metrics_path: '/metrics'
+    # Scheme defaults to 'http'.
+    scheme: 'http'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'
+
+  # Redis metrics (if redis_exporter is running)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['localhost:6379']
+        labels:
+          service: 'redis'
+          component: 'cache'
+    # Skip scraping redis directly; use redis_exporter instead
+    # Uncomment below if using redis_exporter on port 9121
+    # static_configs:
+    #   - targets: ['localhost:9121']
+    #     labels:
+    #       service: 'redis'
+    #       component: 'exporter'

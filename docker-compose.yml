@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: bridge_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chatgpt_bridge
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - BROWSER_HEADLESS=true
+    ports:
+      - "8000:8000"
+      - "9090:9090"
+    volumes:
+      - ./browser_profiles:/app/browser_profiles
+      - ./logs:/app/logs
+    restart: unless-stopped
+    shm_size: "2gb"
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: bridge_prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  prometheus_data:
